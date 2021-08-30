@@ -45,6 +45,10 @@ type Procstat struct {
 	createPIDFinder func() (PIDFinder, error)
 	procs           map[PID]Process
 	createProcess   func(PID) (Process, error)
+
+	gatherEcho int64
+	dbStartTime time.Time
+	gatherStartTime time.Time
 }
 
 var sampleConfig = `
@@ -115,9 +119,19 @@ func (p *Procstat) Gather(acc telegraf.Accumulator) error {
 	if p.createProcess == nil {
 		p.createProcess = defaultProcess
 	}
+	if p.gatherStartTime.IsZero() {
+		p.gatherStartTime = time.Now()
+	}
+	if p.dbStartTime.IsZero() {
+		p.dbStartTime = time.Date(
+			1992, 11, 29, 0, 0, 0, 0, time.Now().Location())
+	}
+
 
 	pids, tags, err := p.findPids()
-	now := time.Now()
+	nowTemp := time.Now()
+	duration := nowTemp.Sub(p.gatherStartTime)
+	now := p.dbStartTime.Add(duration)
 
 	if err != nil {
 		fields := map[string]interface{}{

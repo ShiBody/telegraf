@@ -50,6 +50,7 @@ const (
 	EpochNano        = "EPOCH_NANO"
 	SyslogTimestamp  = "SYSLOG_TIMESTAMP"
 	GenericTimestamp = "GENERIC_TIMESTAMP"
+	EchoCount		 = "ECHO_COUNT"
 )
 
 var (
@@ -124,6 +125,8 @@ type Parser struct {
 	timeFunc func() time.Time
 	g        *grok.Grok
 	tsModder *tsModder
+
+	echoStartTimestamp time.Time
 }
 
 // Compile is a bound method to Parser which will process the options for our parser
@@ -188,6 +191,9 @@ func (p *Parser) Compile() error {
 		p.timeFunc = time.Now
 	}
 
+	p.echoStartTimestamp = time.Date(
+		1992, 11, 29, 0, 0, 0, 0, p.loc)
+
 	return p.compileCustomPatterns()
 }
 
@@ -222,6 +228,7 @@ func (p *Parser) ParseLine(line string) (telegraf.Metric, error) {
 	}
 
 	timestamp := time.Now()
+
 	for k, v := range values {
 		if k == "" || v == "" {
 			continue
@@ -233,6 +240,7 @@ func (p *Parser) ParseLine(line string) (telegraf.Metric, error) {
 			t = types[k]
 		}
 		// if we didn't find a modifier, check if we have a timestamp layout
+
 		if t == "" {
 			if ts, ok := p.tsMap[patternName]; ok {
 				// check if the modifier is a timestamp layout
@@ -247,6 +255,14 @@ func (p *Parser) ParseLine(line string) (telegraf.Metric, error) {
 		}
 
 		switch t {
+		case EchoCount:
+			iv, err := strconv.ParseInt(v, 0, 64)
+			if err != nil {
+				log.Printf("E! Error parsing %s to int: %s", v, err)
+			} else {
+				timestamp = p.echoStartTimestamp.Add(time.Second * time.Duration(iv))
+			}
+
 		case Measurement:
 			p.Measurement = v
 		case Int:
